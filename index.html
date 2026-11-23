@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1A1815">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Mes apps</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root { --black: #1A1815; --cream: #F5F0E8; --brass: #C4963C; --sage: #7A8C7E; --concrete: #9A9590; --line: #E2DBCF; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--cream); color: var(--black);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    background: var(--black); color: var(--cream);
+    padding: calc(28px + env(safe-area-inset-top, 0px)) 20px 26px;
+  }
+  header h1 { font: 600 32px/1.1 "Cormorant Garamond", Georgia, serif; margin: 0; }
+  header h1 span { color: var(--brass); }
+  header p { margin: 6px 0 0; color: var(--concrete); font-size: 14px; }
+  main { max-width: 720px; margin: 0 auto; padding: 18px 16px calc(30px + env(safe-area-inset-bottom, 0px)); }
+  .grid { display: grid; gap: 12px; }
+  a.app {
+    display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 16px;
+    background: #fff; border: 1px solid var(--line); color: inherit; text-decoration: none;
+    transition: transform .08s, box-shadow .15s;
+  }
+  a.app:active { transform: scale(.985); }
+  @media (hover: hover) { a.app:hover { box-shadow: 0 4px 16px rgba(26,24,21,.08); } }
+  .ic {
+    flex: none; width: 56px; height: 56px; border-radius: 14px; overflow: hidden;
+    background: var(--black); color: var(--brass); display: grid; place-items: center;
+    font: 700 24px/1 Georgia, serif;
+  }
+  .ic img { width: 100%; height: 100%; display: block; }
+  .tx { flex: 1; min-width: 0; }
+  .tx b { display: block; font-size: 17px; }
+  .tx small { display: block; color: #6d675e; font-size: 14px; margin-top: 2px; }
+  .tx em { display: inline-block; font-style: normal; font-size: 11px; font-weight: 700; color: var(--black);
+    background: var(--brass); border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
+  .chev { color: var(--concrete); font-size: 22px; }
+  .note { color: #6d675e; font-size: 13px; text-align: center; margin-top: 18px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Mes apps<span>.</span></h1>
+  <p id="sub">Chargement…</p>
+</header>
+<main>
+  <div class="grid" id="apps"></div>
+  <div class="note" id="note"></div>
+</main>
+<script>
+(() => {
+  // Toute app dont le dépôt GitHub porte l'étiquette (topic) « accueil » apparaît ici.
+  // Description du dépôt au format « Nom — phrase courte ». Icône : <app>/icon.svg si elle existe.
+  const USER = 'nabilsoufian', TOPIC = 'accueil', CACHE = 'accueil-apps-v1';
+  const FALLBACK = [
+    { name: 'nosnos-comptage', description: 'NOS/NOS Comptage — Compter les passages devant un local, sur le téléphone', created_at: '2026-11-23T20:41:14Z' },
+    { name: 'nosnos-annonces', description: 'NOS/NOS Annonces — Les annonces de locaux à Varsovie, en liste et sur la carte', created_at: '2026-11-21T16:27:21Z' },
+  ];
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function render(list, fromCache) {
+    list = list.slice().sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const week = Date.now() - 7 * 864e5;
+    document.getElementById('apps').innerHTML = list.map(r => {
+      const [title, desc] = (r.description || r.name).split(/\s+—\s+/);
+      const url = r.homepage || `https://${USER}.github.io/${r.name}/`;
+      const letter = (title.replace(/^NOS\/NOS\s*/, '') || title).trim()[0] || '?';
+      const isNew = Date.parse(r.created_at) > week;
+      return `<a class="app" href="${esc(url)}">
+        <div class="ic"><img src="${esc(url)}icon.svg" alt="" onerror="this.replaceWith(document.createTextNode('${esc(letter.toUpperCase())}'))"></div>
+        <div class="tx"><b>${esc(title)}${isNew ? '<em>nouveau</em>' : ''}</b>${desc ? `<small>${esc(desc)}</small>` : ''}</div>
+        <div class="chev">›</div></a>`;
+    }).join('');
+    document.getElementById('sub').textContent = `${list.length} app${list.length > 1 ? 's' : ''}`;
+    document.getElementById('note').textContent = fromCache ? 'Hors connexion : dernière liste connue.' : '';
+  }
+
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem(CACHE)); } catch (e) {}
+  render(cached || FALLBACK, false);
+
+  fetch(`https://api.github.com/users/${USER}/repos?per_page=100&sort=created`, { headers: { Accept: 'application/vnd.github+json' } })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(repos => {
+      const apps = repos.filter(r => (r.topics || []).includes(TOPIC) && !r.archived)
+        .map(({ name, description, homepage, created_at }) => ({ name, description, homepage, created_at }));
+      localStorage.setItem(CACHE, JSON.stringify(apps));
+      render(apps, false);
+    })
+    .catch(() => { if (cached) render(cached, true); });
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
